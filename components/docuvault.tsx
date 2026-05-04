@@ -34,6 +34,8 @@ interface DocuFile {
   size: number;
   dateModified: string;
   owner: string;
+  fileUrl: string;
+  downloadUrl: string;
 }
 
 // -------------------------------------------------------------------
@@ -75,6 +77,8 @@ function mapApiFile(f: ApiFile): DocuFile {
     size: f.size_bytes,
     dateModified: f.updated_at,
     owner: "Me",
+    fileUrl: f.file_url,
+    downloadUrl: f.download_url,
   };
 }
 
@@ -176,6 +180,36 @@ const TYPE_FILTERS: Record<NavId, string[] | null> = {
 };
 
 const STORAGE_SHADES = ["#2DD4BF", "#26C3B1", "#20B2A3", "#1AA195", "#159087", "#107F7A"];
+
+async function openFile(url: string) {
+  try {
+    const res = await fetch(url, { method: "HEAD" });
+    if (!res.ok) {
+      alert(`Could not open file (${res.status}). The record may have been deleted.`);
+      return;
+    }
+  } catch {
+    // CORS or network error — try opening anyway (cross-origin HEAD may be blocked)
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function downloadFile(url: string) {
+  const dlUrl = `${url}${url.includes("?") ? "&" : "?"}dl=1`;
+  try {
+    const res = await fetch(dlUrl, { method: "HEAD" });
+    if (!res.ok) {
+      alert(`Could not download file (${res.status}). The record may have been deleted.`);
+      return;
+    }
+  } catch {
+    // CORS or network error — proceed anyway
+  }
+  const a = document.createElement("a");
+  a.href = dlUrl;
+  a.rel = "noopener noreferrer";
+  a.click();
+}
 
 // -------------------------------------------------------------------
 // Component
@@ -427,10 +461,11 @@ export default function DocuVault({
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="bg-white p-4 rounded-lg shadow-sm border border-transparent hover:border-blue-500 hover:shadow-md transition-all cursor-default flex items-center gap-4 select-none"
+                      onClick={() => openFile(item.fileUrl)}
+                      className="bg-white p-4 rounded-lg shadow-sm border border-transparent hover:border-blue-500 hover:shadow-md transition-all cursor-pointer flex items-center gap-4 select-none group"
                     >
                       <i className={`fa-solid ${icon} ${color} fa-2x`} />
-                      <div className="overflow-hidden">
+                      <div className="overflow-hidden flex-grow">
                         <p className="font-medium text-slate-700 truncate text-sm">
                           {item.name}
                         </p>
@@ -438,6 +473,13 @@ export default function DocuVault({
                           {formatDate(item.dateModified)}
                         </p>
                       </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); downloadFile(item.downloadUrl); }}
+                        title="Download"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex-shrink-0"
+                      >
+                        <i className="fa-solid fa-download text-sm" />
+                      </button>
                     </motion.div>
                   );
                 })}
@@ -473,12 +515,20 @@ export default function DocuVault({
                     initial={{ opacity: 0, scale: 0.96 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.15, delay: idx * 0.02 }}
-                    className="flex flex-col items-center justify-center p-4 rounded-xl text-center cursor-default transition-all duration-200 border-2 select-none bg-white border-transparent hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm"
+                    onClick={() => openFile(item.fileUrl)}
+                    className="relative flex flex-col items-center justify-center p-4 rounded-xl text-center cursor-pointer transition-all duration-200 border-2 select-none bg-white border-transparent hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm group"
                   >
                     <i className={`fa-solid ${icon} ${color} fa-4x mb-3`} />
                     <span className="font-medium text-sm text-slate-700 break-words w-full truncate">
                       {item.name}
                     </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadFile(item.downloadUrl); }}
+                      title="Download"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg bg-white shadow-sm border border-slate-200 text-slate-400 hover:text-slate-600"
+                    >
+                      <i className="fa-solid fa-download text-xs" />
+                    </button>
                   </motion.div>
                 );
               })}
@@ -511,7 +561,7 @@ export default function DocuVault({
                   Size{" "}
                   <i className={`fa-solid ${sortIcon("size")} text-[10px]`} />
                 </div>
-                <div className="hidden md:block col-span-2">Owner</div>
+                <div className="hidden md:block col-span-2">Actions</div>
               </div>
 
               {filteredFiles.map((item, idx) => {
@@ -522,7 +572,8 @@ export default function DocuVault({
                     initial={{ opacity: 0, x: -4 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.12, delay: idx * 0.015 }}
-                    className="grid grid-cols-12 items-center gap-4 px-4 py-3 rounded-lg cursor-default transition-all duration-200 select-none border-l-4 bg-white border-l-transparent hover:bg-slate-50 hover:border-l-slate-300 mb-1"
+                    onClick={() => openFile(item.fileUrl)}
+                    className="grid grid-cols-12 items-center gap-4 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200 select-none border-l-4 bg-white border-l-transparent hover:bg-slate-50 hover:border-l-slate-300 mb-1 group"
                   >
                     <div className="col-span-12 md:col-span-5 flex items-center gap-4">
                       <i className={`fa-solid ${icon} ${color} fa-lg w-5 text-center`} />
@@ -536,8 +587,21 @@ export default function DocuVault({
                     <div className="col-span-6 md:col-span-2 text-sm text-slate-500">
                       {formatBytes(item.size)}
                     </div>
-                    <div className="hidden md:block col-span-2 text-sm text-slate-500">
-                      {item.owner}
+                    <div className="hidden md:flex col-span-2 items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openFile(item.fileUrl); }}
+                        title="Open"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <i className="fa-solid fa-arrow-up-right-from-square text-sm" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); downloadFile(item.downloadUrl); }}
+                        title="Download"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                      >
+                        <i className="fa-solid fa-download text-sm" />
+                      </button>
                     </div>
                   </motion.div>
                 );
